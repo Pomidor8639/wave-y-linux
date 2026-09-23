@@ -1,0 +1,8 @@
+*.exe
+*.rar
+*.zip
+*.bin
+*.tar.gz
+*.7z
+build/
+output/

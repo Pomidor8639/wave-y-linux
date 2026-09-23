@@ -1,0 +1,64 @@
+name: Build Wave Y Linux Kernel
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential bc bison flex libssl-dev libc6-i386 lib32stdc++6 lib32z1 cpio wget curl git
+
+    - name: Clone Google ARM GCC 4.8 Toolchain
+      run: |
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8 toolchain
+
+    - name: Clone Samsung BCM21553 Kernel Source
+      run: |
+        git clone --depth=1 -b cm-11.0 https://github.com/CyanogenMod-ARMv6/android_kernel_samsung_bcm21553-common.git kernel
+
+    - name: Build Minimal RootFS (BusyBox + Init)
+      run: |
+        mkdir -p rootfs_build/bin rootfs_build/sbin rootfs_build/etc rootfs_build/proc rootfs_build/sys rootfs_build/dev rootfs_build/tmp rootfs_build/root
+        wget -q https://busybox.net/downloads/binaries/1.21.1/busybox-armv6l -O rootfs_build/bin/busybox
+        chmod +x rootfs_build/bin/busybox
+        for app in sh ls cat echo ps mount umount dmesg sleep reboot hostname clear uname free kill grep head tail date; do
+          ln -s busybox rootfs_build/bin/$app
+        done
+        cp rootfs/init rootfs_build/init
+        chmod +x rootfs_build/init
+        cd rootfs_build
+        find . | cpio -o -H newc | gzip -9 > ../kernel/rootfs.cpio.gz
+        cd ..
+        ls -la kernel/rootfs.cpio.gz
+
+    - name: Configure and Compile Linux Kernel
+      run: |
+        cp config/wave_y_defconfig kernel/arch/arm/configs/wave_y_defconfig
+        cd kernel
+        export ARCH=arm
+        export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/arm-eabi-
+        make wave_y_defconfig
+        make -j$(nproc) zImage
+        cd ..
+
+    - name: Prepare Artifacts
+      run: |
+        mkdir -p output
+        cp kernel/arch/arm/boot/zImage output/zImage
+        ls -la output/zImage
+
+    - name: Upload zImage Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wave-y-zImage
+        path: output/zImage

@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# Mount virtual filesystems
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+
+# Set up hostname
+hostname wave-y
+
+# Clear screen and display banner
+clear
+echo "======================================================="
+echo "   WELCOME TO LINUX ON SAMSUNG WAVE Y (GT-S5380F)     "
+echo "   SoC: Broadcom BCM21553 (ARMv6 @ 832 MHz)           "
+echo "   Kernel: Linux 2.6.35.7                              "
+echo "   Console: UART A (COM15 via USB)                    "
+echo "======================================================="
+echo ""
+echo "Type 'help' or standard commands (ls, ps, free, cat, dmesg)"
+echo ""
+
+# Spawn interactive shell on serial console ttyS0
+while true; do
+    /bin/sh </dev/ttyS0 >/dev/ttyS0 2>&1
+    sleep 1
+done

@@ -25,6 +25,7 @@ jobs:
           cp kernel/include/linux/compiler-gcc4.h kernel/include/linux/compiler-gcc5.h
           cp kernel/include/linux/compiler-gcc4.h kernel/include/linux/compiler-gcc7.h
           cp kernel/include/linux/compiler-gcc4.h kernel/include/linux/compiler-gcc8.h
+          sed -i 's/extern inline void \*return_address/static inline void \*return_address/' kernel/arch/arm/include/asm/ftrace.h
 
           echo '=== Step 2: Build Minimal RootFS ==='
           mkdir -p rootfs_build/bin rootfs_build/sbin rootfs_build/etc rootfs_build/proc rootfs_build/sys rootfs_build/dev rootfs_build/tmp rootfs_build/root

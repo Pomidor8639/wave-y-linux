@@ -36,6 +36,10 @@ cd kernel
 export ARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabi-
 make wave_y_defconfig
+sed -i 's/CONFIG_VGA_CONSOLE=y/# CONFIG_VGA_CONSOLE is not set/' .config || true
+echo "# CONFIG_VGA_CONSOLE is not set" >> .config
+echo "CONFIG_DUMMY_CONSOLE=y" >> .config
+echo "CONFIG_BCM_LCD_SKIP_INIT=y" >> .config
 make -j4 zImage
 cd ..
 

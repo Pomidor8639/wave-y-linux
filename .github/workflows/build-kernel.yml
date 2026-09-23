@@ -15,12 +15,16 @@ jobs:
 
     - name: Install build dependencies
       run: |
+        sudo dpkg --add-architecture i386
         sudo apt-get update
-        sudo apt-get install -y build-essential bc bison flex libssl-dev libc6-i386 lib32stdc++6 lib32z1 cpio wget curl git
+        sudo apt-get install -y build-essential bc bison flex libssl-dev libc6:i386 libstdc++6:i386 zlib1g:i386 cpio wget curl git
+        # Verify 32-bit runner capability
+        sudo apt-get install -y libncurses5:i386 || true
 
     - name: Clone Google ARM GCC 4.8 Toolchain
       run: |
         git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8 toolchain
+        $GITHUB_WORKSPACE/toolchain/bin/arm-eabi-gcc --version
 
     - name: Clone Samsung BCM21553 Kernel Source
       run: |

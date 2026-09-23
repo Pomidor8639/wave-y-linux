@@ -9,6 +9,16 @@ import sys
 import struct
 import hashlib
 
+def multiloader_md5(data):
+    ctx = hashlib.md5()
+    chunk_size = 64
+    for i in range(0, len(data), chunk_size):
+        chunk = data[i:i+chunk_size]
+        if len(chunk) < chunk_size:
+            chunk = chunk + b'\x00' * (chunk_size - len(chunk))
+        ctx.update(chunk)
+    return ctx.digest()
+
 def pack_bada_apps(input_file, output_file, model_name='S5380', nand_addr=0x00C00000):
     with open(input_file, 'rb') as f:
         payload = f.read()
@@ -22,9 +32,9 @@ def pack_bada_apps(input_file, output_file, model_name='S5380', nand_addr=0x00C0
         if magic == 0x016F2818:
             print(f"[*] Detected valid ARM Linux zImage (magic 0x{magic:08x})")
 
-    md5_digest = hashlib.md5(payload).digest()
+    pad_md5 = multiloader_md5(payload)
     print(f"[*] Payload size: {payload_len} bytes ({payload_len / 1024 / 1024:.2f} MB)")
-    print(f"[*] Payload MD5:  {md5_digest.hex()}")
+    print(f"[*] MultiLoader Padded MD5: {pad_md5.hex()}")
 
     footer = bytearray(1024)
 
@@ -42,13 +52,18 @@ def pack_bada_apps(input_file, output_file, model_name='S5380', nand_addr=0x00C0
     footer[44 : 44 + len(ext_bytes)] = ext_bytes
 
     # 0x34: unk1 flags (5 x uint32)
-    struct.pack_into('<5I', footer, 52, 0, 2, 2, 0x1000, 0x40000)
+    # flag 0: 0
+    # flag 1: 0 (Hash check bypass - skips hash verification in MultiLoader v5.67)
+    # flag 2: 0
+    # flag 3: 0x1000 (NAND Page Size: 4096 bytes)
+    # flag 4: 0x40000 (NAND Block Size: 256 KB)
+    struct.pack_into('<5I', footer, 52, 0, 0, 0, 0x1000, 0x40000)
 
     # 0x228: Tool Version string
     footer[0x228 : 0x228 + 16] = b'TkToolVer:2.0.0\x00'
 
-    # 0x248: MD5 Checksum (16 bytes)
-    footer[0x248 : 0x248 + 16] = md5_digest
+    # 0x248: MD5 Checksum (16 bytes, using MultiLoader padded MD5)
+    footer[0x248 : 0x248 + 16] = pad_md5
 
     with open(output_file, 'wb') as f:
         f.write(payload)

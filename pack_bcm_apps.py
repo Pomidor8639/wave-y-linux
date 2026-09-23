@@ -53,11 +53,11 @@ def pack_bada_apps(input_file, output_file, model_name='S5380', nand_addr=0x00C0
 
     # 0x34: unk1 flags (5 x uint32)
     # flag 0: 0
-    # flag 1: 0 (Hash check bypass - skips hash verification in MultiLoader v5.67)
-    # flag 2: 0
+    # flag 1: 1 (Bypasses MD5 hash check since 1 < 2, but enables NAND size copy since 1 >= 1)
+    # flag 2: 2 (NAND Type 2)
     # flag 3: 0x1000 (NAND Page Size: 4096 bytes)
-    # flag 4: 0x40000 (NAND Block Size: 256 KB)
-    struct.pack_into('<5I', footer, 52, 0, 0, 0, 0x1000, 0x40000)
+    # flag 4: 0x40000 (NAND Block Size: 256 KB = 0x40000)
+    struct.pack_into('<5I', footer, 52, 0, 1, 2, 0x1000, 0x40000)
 
     # 0x228: Tool Version string
     footer[0x228 : 0x228 + 16] = b'TkToolVer:2.0.0\x00'

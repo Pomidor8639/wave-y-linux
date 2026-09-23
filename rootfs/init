@@ -8,20 +8,37 @@ mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
 # Set up hostname
 hostname wave-y
 
-# Clear screen and display banner
-clear
-echo "======================================================="
-echo "   WELCOME TO LINUX ON SAMSUNG WAVE Y (GT-S5380F)     "
-echo "   SoC: Broadcom BCM21553 (ARMv6 @ 832 MHz)           "
-echo "   Kernel: Linux 2.6.35.7                              "
-echo "   Console: UART A (COM15 via USB)                    "
-echo "======================================================="
-echo ""
-echo "Type 'help' or standard commands (ls, ps, free, cat, dmesg)"
-echo ""
+# Clear screen and display banner on LCD screen (tty0) and UART (ttyS0)
+clear > /dev/tty0 2>/dev/null || true
+for term in /dev/tty0 /dev/ttyS0 /dev/console; do
+    if [ -e "$term" ]; then
+        echo "=======================================================" > "$term" 2>/dev/null || true
+        echo "   WELCOME TO LINUX ON SAMSUNG WAVE Y (GT-S5380)       " > "$term" 2>/dev/null || true
+        echo "   SoC: Broadcom BCM21553 (ARMv6 @ 832 MHz)           " > "$term" 2>/dev/null || true
+        echo "   Kernel: Linux 2.6.35.7 (Tux on LCD Framebuffer!)   " > "$term" 2>/dev/null || true
+        echo "=======================================================" > "$term" 2>/dev/null || true
+        echo "" > "$term" 2>/dev/null || true
+    fi
+done
 
-# Spawn interactive shell on serial console ttyS0
+# Enable USB Gadget for PC connection
+if [ -d /sys/class/android_usb/android0 ]; then
+    echo 0 > /sys/class/android_usb/android0/enable 2>/dev/null || true
+    echo 04e8 > /sys/class/android_usb/android0/idVendor 2>/dev/null || true
+    echo 685e > /sys/class/android_usb/android0/idProduct 2>/dev/null || true
+    echo "adb,acm" > /sys/class/android_usb/android0/functions 2>/dev/null || true
+    echo 1 > /sys/class/android_usb/android0/enable 2>/dev/null || true
+fi
+
+# Spawn interactive shell
 while true; do
-    /bin/sh </dev/ttyS0 >/dev/ttyS0 2>&1
+    if [ -e /dev/tty0 ]; then
+        /bin/sh </dev/tty0 >/dev/tty0 2>&1
+    elif [ -e /dev/ttyS0 ]; then
+        /bin/sh </dev/ttyS0 >/dev/ttyS0 2>&1
+    else
+        /bin/sh
+    fi
     sleep 1
 done
+

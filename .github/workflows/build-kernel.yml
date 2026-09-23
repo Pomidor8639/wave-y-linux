@@ -27,6 +27,17 @@ jobs:
           cp kernel/include/linux/compiler-gcc4.h kernel/include/linux/compiler-gcc8.h
           sed -i 's/extern inline void \*return_address/static inline void \*return_address/' kernel/arch/arm/include/asm/ftrace.h
 
+          echo '=== Step 1.1: Patch Machine ID for Bada Bootloader ==='
+          sed -i 's/mov\tr7, r1/ldr\tr7, =477/' kernel/arch/arm/boot/compressed/head.S
+          sed -i 's/mov\tr8, r2/mov\tr8, #0/' kernel/arch/arm/boot/compressed/head.S
+          python3 -c "
+with open('kernel/arch/arm/kernel/head.S', 'r') as f:
+    c = f.read()
+c = c.replace('ENTRY(stext)\n', 'ENTRY(stext)\n\tmov\tr0, #0\n\tldr\tr1, =477\n\tmov\tr2, #0\n')
+with open('kernel/arch/arm/kernel/head.S', 'w') as f:
+    f.write(c)
+"
+
           echo '=== Step 2: Build Minimal RootFS ==='
           mkdir -p rootfs_build/bin rootfs_build/sbin rootfs_build/etc rootfs_build/proc rootfs_build/sys rootfs_build/dev rootfs_build/tmp rootfs_build/root
           wget -q https://busybox.net/downloads/binaries/1.21.1/busybox-armv6l -O rootfs_build/bin/busybox
@@ -50,14 +61,16 @@ jobs:
           make -j\$(nproc) zImage
           cd ..
 
-          echo '=== Step 4: Export Artifact ==='
+          echo '=== Step 4: Export & Package Artifacts ==='
           mkdir -p output
           cp kernel/arch/arm/boot/zImage output/zImage
-          ls -lh output/zImage
+          python3 pack_bcm_apps.py output/zImage output/apps_compressed.bin S5380D
+          ls -lh output/
         "
 
-    - name: Upload zImage Artifact
+    - name: Upload Kernel Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: wave-y-zImage
-        path: output/zImage
+        name: wave-y-linux-build
+        path: output/
+

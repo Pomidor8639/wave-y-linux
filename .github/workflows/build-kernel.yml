@@ -13,53 +13,44 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install build dependencies
+    - name: Build Kernel inside Ubuntu 18.04 Container
       run: |
-        sudo dpkg --add-architecture i386
-        sudo apt-get update
-        sudo apt-get install -y build-essential bc bison flex libssl-dev libc6-i386 lib32z1 lib32stdc++6 libc6:i386 libstdc++6:i386 zlib1g:i386 cpio wget curl git file
-        sudo apt-get install -y gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi || true
+        docker run --rm -v $GITHUB_WORKSPACE:/work -w /work ubuntu:18.04 bash -c "
+          set -e
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential bc bison flex libssl-dev gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi cpio wget curl git
 
-    - name: Clone Google ARM GCC 4.8 Toolchain
-      run: |
-        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8 toolchain
-        file $GITHUB_WORKSPACE/toolchain/bin/arm-eabi-gcc
-        $GITHUB_WORKSPACE/toolchain/bin/arm-eabi-gcc --version
+          echo '=== Step 1: Clone Kernel Source ==='
+          git clone --depth=1 -b cm-11.0 https://github.com/CyanogenMod-ARMv6/android_kernel_samsung_bcm21553-common.git kernel
 
-    - name: Clone Samsung BCM21553 Kernel Source
-      run: |
-        git clone --depth=1 -b cm-11.0 https://github.com/CyanogenMod-ARMv6/android_kernel_samsung_bcm21553-common.git kernel
+          echo '=== Step 2: Build Minimal RootFS ==='
+          mkdir -p rootfs_build/bin rootfs_build/sbin rootfs_build/etc rootfs_build/proc rootfs_build/sys rootfs_build/dev rootfs_build/tmp rootfs_build/root
+          wget -q https://busybox.net/downloads/binaries/1.21.1/busybox-armv6l -O rootfs_build/bin/busybox
+          chmod +x rootfs_build/bin/busybox
+          for app in sh ls cat echo ps mount umount dmesg sleep reboot hostname clear uname free kill grep head tail date; do
+            ln -s busybox rootfs_build/bin/\$app
+          done
+          cp rootfs/init rootfs_build/init
+          chmod +x rootfs_build/init
+          cd rootfs_build
+          find . | cpio -o -H newc | gzip -9 > ../kernel/rootfs.cpio.gz
+          cd ..
+          ls -lh kernel/rootfs.cpio.gz
 
-    - name: Build Minimal RootFS (BusyBox + Init)
-      run: |
-        mkdir -p rootfs_build/bin rootfs_build/sbin rootfs_build/etc rootfs_build/proc rootfs_build/sys rootfs_build/dev rootfs_build/tmp rootfs_build/root
-        wget -q https://busybox.net/downloads/binaries/1.21.1/busybox-armv6l -O rootfs_build/bin/busybox
-        chmod +x rootfs_build/bin/busybox
-        for app in sh ls cat echo ps mount umount dmesg sleep reboot hostname clear uname free kill grep head tail date; do
-          ln -s busybox rootfs_build/bin/$app
-        done
-        cp rootfs/init rootfs_build/init
-        chmod +x rootfs_build/init
-        cd rootfs_build
-        find . | cpio -o -H newc | gzip -9 > ../kernel/rootfs.cpio.gz
-        cd ..
-        ls -la kernel/rootfs.cpio.gz
+          echo '=== Step 3: Configure and Compile Kernel ==='
+          cp config/wave_y_defconfig kernel/arch/arm/configs/wave_y_defconfig
+          cd kernel
+          export ARCH=arm
+          export CROSS_COMPILE=arm-linux-gnueabi-
+          make wave_y_defconfig
+          make -j\$(nproc) zImage
+          cd ..
 
-    - name: Configure and Compile Linux Kernel
-      run: |
-        cp config/wave_y_defconfig kernel/arch/arm/configs/wave_y_defconfig
-        cd kernel
-        export ARCH=arm
-        export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/arm-eabi-
-        make wave_y_defconfig
-        make -j$(nproc) zImage
-        cd ..
-
-    - name: Prepare Artifacts
-      run: |
-        mkdir -p output
-        cp kernel/arch/arm/boot/zImage output/zImage
-        ls -la output/zImage
+          echo '=== Step 4: Export Artifact ==='
+          mkdir -p output
+          cp kernel/arch/arm/boot/zImage output/zImage
+          ls -lh output/zImage
+        "
 
     - name: Upload zImage Artifact
       uses: actions/upload-artifact@v4
